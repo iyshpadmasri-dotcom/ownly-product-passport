@@ -1,0 +1,13 @@
+{
+  "name": "ownly-app",
+  "version": "1.0.0",
+  "description": "Ownly - A Simple, Beautiful Digital Product Passport Website",
+  "private": true,
+  "scripts": {
+    "install:all": "npm --prefix backend install && npm --prefix frontend install",
+    "setup:backend": "npm --prefix backend run setup",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "start": "node start.js"
+  }
+}

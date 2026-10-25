@@ -1,0 +1,183 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String               @id @default(uuid())
+  name         String
+  email        String               @unique
+  passwordHash String
+  location     String?
+  city         String?
+  state        String?
+  pincode      String?
+  avatarUrl    String?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  products          Product[]
+  listings          MarketplaceListing[]
+  inquiries         BuyerInquiry[]
+  transfersSent     OwnershipTransfer[]  @relation("TransfersSent")
+  transfersReceived OwnershipTransfer[]  @relation("TransfersReceived")
+}
+
+model Product {
+  id              String               @id @default(uuid())
+  userId          String
+  user            User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name            String
+  brand           String?
+  model           String?
+  category        String
+  imageUrl        String?
+  purchaseDate    DateTime?
+  purchasePrice   Float?               // Stored in INR
+  purchaseStore   String?              // e.g., Amazon India, Flipkart, Croma, Apple Store
+  serialOrImei    String?              // Sensitive: kept private by default
+  warrantyExpiry  DateTime?
+  description     String?
+  condition       String?              @default("Good")
+  lifecycleStatus String               @default("OWNED") // OWNED, LISTED_SALE, REPAIR_PENDING, DONATED, RECYCLED
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  images           ProductImage[]
+  documents        ProductDocument[]
+  history          ProductHistory[]
+  listings         MarketplaceListing[]
+  conditionReports ConditionReport[]
+  transfers        OwnershipTransfer[]
+  shareableReports ShareableReport[]
+}
+
+model ProductImage {
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  caption   String?
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model ProductDocument {
+  id                 String   @id @default(uuid())
+  productId          String
+  product            Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  type               String   // "Purchase Bill", "Warranty", "User Manual", "Service Records", "Other Documents"
+  title              String
+  fileUrl            String
+  fileName           String
+  fileSize           String?
+  mimeType           String?
+  isPublicForListing Boolean  @default(false)
+  createdAt          DateTime @default(now())
+}
+
+model ProductHistory {
+  id              String   @id @default(uuid())
+  productId       String
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  eventDate       DateTime
+  eventType       String   // "Purchase", "Service", "Repair", "Upgrade", "Warranty", "Inspection", "Ownership Transfer", "Donation", "Recycle", "Condition Check", "Other"
+  title           String
+  notes           String?
+  cost            Float?   // in INR
+  serviceProvider String?
+  recordedBy      String?  // Name or role of recorder, e.g. "Sarah Jenkins" or "Authorized Service"
+  evidenceType    String   @default("SELF_REPORTED") // "SELF_REPORTED", "DOCUMENT_SUPPORTED", "VERIFIED"
+  documentId      String?  // Optional reference to a supporting ProductDocument
+  isTransferRecord Boolean @default(false)
+  createdAt       DateTime @default(now())
+}
+
+model ConditionReport {
+  id               String   @id @default(uuid())
+  productId        String
+  product          Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  overallCondition String   // "Brand New", "Like New", "Excellent", "Good", "Fair"
+  checklist        String   // JSON string of category-specific assessments
+  notes            String?
+  evidenceStatus   String   @default("SELLER_REPORTED") // "SELLER_REPORTED" or "DOCUMENT_SUPPORTED"
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model OwnershipTransfer {
+  id             String    @id @default(uuid())
+  productId      String
+  product        Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  fromUserId     String
+  fromUser       User      @relation("TransfersSent", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toEmail        String
+  toUserId       String?
+  toUser         User?     @relation("TransfersReceived", fields: [toUserId], references: [id], onDelete: SetNull)
+  status         String    @default("PENDING") // PENDING, ACCEPTED, REJECTED, CANCELLED
+  notes          String?
+  shareDocuments Boolean   @default(true)
+  shareHistory   Boolean   @default(true)
+  completedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model ShareableReport {
+  id                    String    @id @default(uuid())
+  productId             String
+  product               Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  shareToken            String    @unique
+  includePurchaseDate   Boolean   @default(true)
+  includeWarranty       Boolean   @default(true)
+  includeHistory        Boolean   @default(true)
+  includeConditionReport Boolean  @default(true)
+  includeDocuments      Boolean   @default(false)
+  isRevoked             Boolean   @default(false)
+  expiresAt             DateTime?
+  createdAt             DateTime  @default(now())
+}
+
+model MarketplaceListing {
+  id                String         @id @default(uuid())
+  productId         String
+  product           Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title             String
+  description       String
+  price             Float          // in INR
+  condition         String         // "Brand New", "Like New", "Excellent", "Good", "Fair"
+  location          String?
+  city              String?
+  state             String?
+  pincode           String?
+  status            String         @default("ACTIVE") // ACTIVE, SOLD, DELISTED
+  sharePurchaseDate Boolean        @default(true)
+  shareWarranty     Boolean        @default(true)
+  shareHistory      Boolean        @default(true)
+  shareDocuments    Boolean        @default(false)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  inquiries         BuyerInquiry[]
+}
+
+model BuyerInquiry {
+  id          String              @id @default(uuid())
+  listingId   String
+  listing     MarketplaceListing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  buyerUserId String?
+  buyerUser   User?               @relation(fields: [buyerUserId], references: [id], onDelete: SetNull)
+  buyerName   String
+  buyerEmail  String
+  buyerPhone  String?
+  message     String
+  offerPrice  Float?              // in INR
+  status      String              @default("NEW") // NEW, READ, REPLIED, CLOSED
+  createdAt   DateTime            @default(now())
+}
